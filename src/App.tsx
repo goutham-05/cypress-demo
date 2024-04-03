@@ -1,62 +1,126 @@
-import React, { useState, useEffect, useCallback } from "react";
-import "./App.css";
-import { googleLogout, useGoogleLogin } from "@react-oauth/google";
-import axios from "axios";
+import { Routes, Route, Outlet, Link, Navigate } from "react-router-dom";
 
-function App() {
-  const [user, setUser] = useState([]);
-  const [profile, setProfile] = useState([]);
+const ProtectedRoute = ({ children, allowedRoles }) => {
+  const user = JSON.parse(localStorage.getItem("userData") || "{}");
 
-  const login = useGoogleLogin({
-    onSuccess: (codeResponse) => checkUserInfo(codeResponse),
-    onError: (error) => console.log("Login Failed:", error),
-  });
+  // Check if the user's role is included in the allowedRoles array
+  const hasPermission = user.role && allowedRoles.includes(user.role);
 
-  const checkUserInfo = useCallback((userResponse) => {
-    if (userResponse) {
-      axios
-        .get(
-          `https://www.googleapis.com/oauth2/v1/userinfo?access_token=${userResponse.access_token}`,
-          {
-            headers: {
-              Authorization: `Bearer ${userResponse.access_token}`,
-              Accept: "application/json",
-            },
-          }
-        )
-        .then((res) => {
-          setProfile(res.data);
-        })
-        .catch((err) => console.log(err));
-    }
-  }, []);
+  if (!hasPermission) {
+    // User does not have any of the required roles, redirect them
+    return <Navigate to="/" replace />;
+  }
 
-  // log out function to log the user out of google and set the profile array to null
-  const logOut = () => {
-    googleLogout();
-    setProfile(null);
-  };
-
+  // User has a required role, allow route access
+  return children;
+};
+export default function App() {
   return (
     <div>
-      <h2>React Google Login</h2>
-      <br />
-      <br />
-      {profile ? (
-        <div>
-          <img src={profile.picture} alt="user image" />
-          <h3>User Logged in</h3>
-          <p>Name: {profile.name}</p>
-          <p>Email Address: {profile.email}</p>
-          <br />
-          <br />
-          <button onClick={logOut}>Log out</button>
-        </div>
-      ) : (
-        <button onClick={login}>Sign in with Google 🚀 </button>
-      )}
+      <h1>Basic Example</h1>
+
+      <p>
+        This example demonstrates some of the core features of React Router
+        including nested <code>&lt;Route&gt;</code>s,{" "}
+        <code>&lt;Outlet&gt;</code>s, <code>&lt;Link&gt;</code>s, and using a
+        "*" route (aka "splat route") to render a "not found" page when someone
+        visits an unrecognized URL.
+      </p>
+
+      {/* Routes nest inside one another. Nested route paths build upon
+            parent route paths, and nested route elements render inside
+            parent route elements. See the note about <Outlet> below. */}
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Home />} />
+          <Route path="about" element={<About />} />
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "superuser", "manager"]}>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Using path="*"" means "match anything", so this route
+                acts like a catch-all for URLs that we don't have explicit
+                routes for. */}
+          <Route path="*" element={<NoMatch />} />
+        </Route>
+      </Routes>
     </div>
   );
 }
 
-export default App;
+function Layout() {
+  const userData = JSON.parse(localStorage.getItem("userData") || "{}");
+
+  // Check if there is user data; if not, redirect to "/"
+  if (Object.keys(userData).length === 0) {
+    return <Navigate to="/" />;
+  }
+  return (
+    <div>
+      {/* A "layout route" is a good place to put markup you want to
+          share across all the pages on your site, like navigation. */}
+      Hello World
+      <nav>
+        <ul>
+          <li>
+            <Link to="/">Home</Link>
+          </li>
+          <li>
+            <Link to="/about">About</Link>
+          </li>
+          <li>
+            <Link to="/dashboard">Dashboard</Link>
+          </li>
+          <li>
+            <Link to="/nothing-here">Nothing Here</Link>
+          </li>
+        </ul>
+      </nav>
+      <hr />
+      {/* An <Outlet> renders whatever child route is currently active,
+          so you can think about this <Outlet> as a placeholder for
+          the child routes we defined above. */}
+      <Outlet />
+    </div>
+  );
+}
+
+function Home() {
+  return (
+    <div>
+      <h2>Home</h2>
+    </div>
+  );
+}
+
+function About() {
+  return (
+    <div>
+      <h2>About</h2>
+    </div>
+  );
+}
+
+function Dashboard() {
+  return (
+    <div>
+      <h2>Dashboard</h2>
+    </div>
+  );
+}
+
+function NoMatch() {
+  return (
+    <div>
+      <h2>Nothing to see here!</h2>
+      <p>
+        <Link to="/">Go to the home page</Link>
+      </p>
+    </div>
+  );
+}
